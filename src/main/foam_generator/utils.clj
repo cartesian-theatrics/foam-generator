@@ -124,3 +124,16 @@ distance `l`."
   [[[x1 y1] [x2 y2]]]
   (/ (- y2 y1)
      (- x2 x1)))
+
+(defmacro
+  ^{:style/indet [1 [[:defn]] :form]}
+  defmodule
+  [name args body]
+  `(do (defn ~name ~args
+         (~(keyword name) ~@args))
+       (defmethod s/write-scad ~(keyword name)
+         [indent# [_ args# body#]]
+         (concat (repeat indent# " ")
+                 ~(str name)
+                 "(" ~a ")"))
+       (m/define-module ~(str name) )))
