@@ -67,7 +67,6 @@
   ([levels rows cols hole-size]
    (grid-3d levels rows cols hole-size true)))
 
-(comment)
 (->> (grid-3d 6 10 10 0.8)
      (s/write-scad)
      (spit "test.scad"))
