@@ -125,7 +125,7 @@ distance `l`."
   (/ (- y2 y1)
      (- x2 x1)))
 
-(defmacro
+#_(defmacro
   ^{:style/indet [1 [[:defn]] :form]}
   defmodule
   [name args body]

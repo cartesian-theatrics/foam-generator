@@ -4,7 +4,6 @@
    [scad-clj.model :as m]
    [scad-clj.scad :as s]))
 
-(Math/round 1.1)
 (comment
 
   (let [x-length 36
@@ -67,8 +66,6 @@
                         [0 r]
                         [(* h (Math/cos (/ Math/PI 4))) (+ r (* h (Math/sin (/ Math/PI 4))))]]
                        1/2)))
-
-(Math/atan (/ Math/PI 20))
 
 (defn foam-chamber [bottom-width radius height offset]
   (let [line (m/cube 1 0.5 0.5 :center true)
