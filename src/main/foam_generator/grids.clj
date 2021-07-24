@@ -32,9 +32,8 @@
       (m/square w h :center center?)
       (for [x (range (if offset? hole-size 0) (+ 0.01 w (if offset? (- hole-size) 0)) (* 2 hole-size))
             y (range (if offset? hole-size 0) (+ 0.01 h (if offset? (- hole-size) 0)) (* 2 hole-size))]
-        (->> (m/square hole-size hole-size :center true)
+        (->> (m/square hole-size hole-size :center center?)
              (m/translate [(if center? (- x (/ w 2)) x)
-
                            (if center? (- y (/ h 2)) y)]))))))
   ([rows cols hole-size center?]
    (grid-2d rows cols hole-size center? false))
@@ -51,7 +50,7 @@
       (m/difference
        (->> (m/square w h :center true)
             (m/extrude-linear {:height z :center false}))
-       (->> (m/square (- w 2) (- h 2) :center true)
+       (->> (m/square (- w 2) (- h 2) :center  true)
             (m/extrude-linear {:height z :center false})
             (m/translate [0 0 1])))
       (concat
@@ -67,6 +66,10 @@
   ([levels rows cols hole-size]
    (grid-3d levels rows cols hole-size true)))
 
-(->> (grid-3d 6 10 10 0.8)
-     (s/write-scad)
-     (spit "test.scad"))
+
+(comment
+  (->> (grid-3d 6 10 10 0.8)
+       (s/write-scad)
+       (spit "test.scad"))
+
+  )

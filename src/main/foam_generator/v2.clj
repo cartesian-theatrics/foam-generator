@@ -120,7 +120,7 @@
                            [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]])
                 (m/extrude-linear {:height 1 :center false})
                 (m/translate [0 0 intake-nozzle-length]))))]
-  (->> #_(m/union layers shell)
+  (->> (m/union layers shell)
        (m/union (m/difference intake hole-pattern)
                 #_hole-pattern)
        (s/write-scad (m/use "scad-utils/morphology.scad"))
