@@ -45,8 +45,8 @@
          (s/write-scad (m/use "scad-utils/morphology.scad"))
          (spit "test.scad"))))
 
-(let [x 35
-      y 60
+(let [x 20
+      y 50
       z 15
       square (m/square x y :center true)
       hole-size 1/2
@@ -71,19 +71,18 @@
                 (m/translate [0 0 z] (if (odd? z) hole-pattern-1 hole-pattern-2))))
 
       shell-thickness 1
-      shell-height (+ z 40)
       shell (m/difference
-             (m/translate [0 0 (/ shell-height 2)] (m/cube x y shell-height :center true))
-             (->> (m/cube (- x (* 2 shell-thickness)) (- y (* 2 shell-thickness)) shell-height :center true)
-                  (m/translate [0 0 (+ (/ shell-height 2) shell-thickness)])))
+             (m/translate [0 0 (/ z 2)] (m/cube x y z :center true))
+             (->> (m/cube (- x (* 2 shell-thickness)) (- y (* 2 shell-thickness)) z :center true)
+                  (m/translate [0 0 (+ (/ z 2) shell-thickness)])))
 
       intake-nozzle-thickness 3
       intake-nozzle-radius 7
-      intake-nozzle-length 15
+      intake-nozzle-length 10
       intake-hole-size 2
       nozzle-interior-length (- y 10)
       t-x 12
-      t-y 8
+      t-y 14
       hole-pattern (->> (m/union
                          (for [x (range 0 5 (* 2 intake-hole-size))
                                y (range 0 nozzle-interior-length (* 2 intake-hole-size))]
@@ -93,55 +92,36 @@
                         (m/rotatec [(/ Math/PI 2) 0 0])
                         (m/translate [0 (- (/ t-y 2)) intake-nozzle-length]))
       offset 2
-      outer-intake
-      (->> (m/union
-            (->> (m/polygon [[(- (/ t-x 2)) (- (/ t-y 2))]
+      intake (m/difference
+              (m/union
+               (->> (m/difference
+                     (m/polygon [[(- (/ t-x 2)) (- (/ t-y 2))]
+                                 [0 (/ t-y 2)]
+                                 [(/ t-x 2) (- (/ t-y 2))]])
+                     (m/polygon[[(- (/ (- t-x 2) 2)) (- (/ (- t-y 2) 2))]
+                                [0 (/ (- t-y 2) 2)]
+                                [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]]))
+                    (m/extrude-linear {:height (- y 10) :center false})
+                    (m/translate [0 0 intake-nozzle-length]))
+               (m/extrude-linear {:height 1 :center false})
+               (m/hull
+                (m/cylinder intake-nozzle-radius 5 :center false)
+                (->>
+                 (m/polygon [[(- (/ t-x 2)) (- (/ t-y 2))]
                              [0 (/ t-y 2)]
                              [(/ t-x 2) (- (/ t-y 2))]])
-                 (m/extrude-linear {:height (- y 10) :center false})
-                 (m/translate [0 0 intake-nozzle-length]))
-            (m/hull
-             (m/cylinder intake-nozzle-radius 5 :center false)
-             (->>
-              (m/polygon [[(- (/ t-x 2)) (- (/ t-y 2))]
-                          [0 (/ t-y 2)]
-                          [(/ t-x 2) (- (/ t-y 2))]])
-              (m/extrude-linear {:height 1 :center false})
-              (m/translate [0 0 intake-nozzle-length]))))
-           (m/rotatec [(/ Math/PI 2) 0 0])
-           (m/translate [0 (+ intake-nozzle-length (/ nozzle-interior-length 2)) (+ 10 (/ t-y 2))]))
-      inner-intake
-      (->> (m/union
-            hole-pattern
-            (->> (m/polygon [[(- (/ (- t-x 2) 2)) (- (/ (- t-y 2) 2))]
-                             [0 (/ (- t-y 2) 2)]
-                             [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]])
-                 (m/extrude-linear {:height (- y 10) :center false})
-                 (m/translate [0 0 intake-nozzle-length]))
-            (m/hull
-             (m/cylinder (dec intake-nozzle-radius) 5 :center false)
-             (->>
-              (m/polygon [[(- (/ (- t-x 2) 2)) (- (/ (- t-y 2) 2))]
-                          [0 (/ (- t-y 2) 2)]
-                          [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]])
-              (m/extrude-linear {:height 1 :center false})
-              (m/translate [0 0 intake-nozzle-length]))))
-           (m/rotatec [(/ Math/PI 2) 0 0])
-           (m/translate [0 (+ intake-nozzle-length (/ nozzle-interior-length 2)) (+ 10 (/ t-y 2))]))
-      #_(m/hull
-         (m/cylinder (dec intake-nozzle-radius) 5 :center false)
-         (->>
-          (m/polygon[[(- (/ (- t-x 2) 2)) (- (/ (- t-y 2) 2))]
-                     [0 (/ (- t-y 2) 2)]
-                     [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]])
-          (m/extrude-linear {:height 1 :center false})
-          (m/translate [0 0 intake-nozzle-length])))]
-  (->> #_(m/union layers shell)
-       (m/union (m/difference (m/union layers shell)
-                              (m/union outer-intake
-                                       (->> (m/cylinder 7 1 :center false)
-                                            (m/rotatec [(/ Math/PI 2) 0 0])
-                                            (m/translate [0 (- (/ y 2)) (+ 5 7/2)]))))
-                (m/difference outer-intake inner-intake))
+                 (m/extrude-linear {:height 1 :center false})
+                 (m/translate [0 0 intake-nozzle-length]))))
+              (m/hull
+               (m/cylinder (dec intake-nozzle-radius) 5 :center false)
+               (->>
+                (m/polygon[[(- (/ (- t-x 2) 2)) (- (/ (- t-y 2) 2))]
+                           [0 (/ (- t-y 2) 2)]
+                           [(/ (- t-x 2) 2) (- (/ (- t-y 2) 2))]])
+                (m/extrude-linear {:height 1 :center false})
+                (m/translate [0 0 intake-nozzle-length]))))]
+  (->> (m/union layers shell)
+       (m/union (m/difference intake hole-pattern)
+                #_hole-pattern)
        (s/write-scad (m/use "scad-utils/morphology.scad"))
        (spit "test.scad")))
