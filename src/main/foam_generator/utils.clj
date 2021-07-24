@@ -125,7 +125,7 @@ distance `l`."
   (/ (- y2 y1)
      (- x2 x1)))
 
-(defmacro
+#_(defmacro
   ^{:style/indet [1 [[:defn]] :form]}
   defmodule
   [name args body]
@@ -137,3 +137,15 @@ distance `l`."
                  ~(str name)
                  "(" ~a ")"))
        (m/define-module ~(str name) )))
+
+(defn irange
+  ([start end step]
+   (take-while (if (pos? step) #(<= % end) #(>= % end)) (iterate #(+ % step) start)))
+  ([start end]
+   (irange start end 1))
+  ([end]
+   (irange 0 end))
+  ([] (range)))
+
+
+(defn cuboid [x y z fillet-r])
