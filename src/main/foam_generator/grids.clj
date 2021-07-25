@@ -66,9 +66,22 @@
   ([levels rows cols hole-size]
    (grid-3d levels rows cols hole-size true)))
 
+(defn fast-grid-3d
+  [levels rows cols cell-size]
+  (let [line (->> (u/polyline [[0 0] [0 (* 2 cell-size cols)]] (/ cell-size 2))
+                  (m/extrude-linear {:height cell-size :center false}))]
+    (m/union
+     (for [z (range 0 levels)
+           y (range 0 rows)]
+       (if (odd? z)
+         (->> line
+              (m/rotatec [0 0 (/ Math/PI 2)])
+              (m/translate [(* 2 rows cell-size) (* 2 cell-size y) (* 1 cell-size z)]))
+         (->> line
+              (m/translate [(* 2 cell-size y) 0 (* 1 cell-size z)])))))))
 
 (comment
-  (->> (grid-3d 6 10 10 0.8)
+  (->> (fast-grid-3d 6 10 15 0.8)
        (s/write-scad)
        (spit "test.scad"))
 
