@@ -94,8 +94,8 @@ distance `l`."
    (m/cylinder inner-r h :center center)))
 
 (defn line [p1 p2 thickness]
-  (m/hull (m/translate p1 (m/circle thickness))
-          (m/translate p2 (m/circle thickness))))
+  (m/hull (m/translate p1 (m/square (* 2 thickness) (* 2 thickness) :center true))
+          (m/translate p2 (m/square (* 2 thickness) (* 2 thickness) :center true))))
 
 (defn polyfill [[p1 p2 & pts] thickness]
   (when p2
@@ -108,11 +108,17 @@ distance `l`."
              (polyline (cons p2 pts) thickness))))
 
 (defn curve [r angle thickness]
-  (polyline (for [x (range 0 angle (/ angle 100))]
-              [(* r (Math/cos x)) (* r (Math/sin x)) ])
-            thickness))
+  (m/polygon
+   (concat
+    (reverse
+     (for [x (range 0 angle (/ angle 50))]
+       [(* (- r thickness) (Math/cos x)) (* (- r thickness) (Math/sin x))]))
+    (for [x (range 0 angle (/ angle 50))]
+      [(* r (Math/cos x)) (* r (Math/sin x))]))))
 
-
+(defn curve-points [r angle]
+  (for [x (range (- (/ angle 2)) (/ angle 2) (/ angle 50))]
+    [(* r (Math/cos x)) (* r (Math/sin x)) ]))
 
 (defn semi-circle [r angle]
   (m/hull
@@ -171,7 +177,7 @@ distance `l`."
 
 (defn rotate-extrude
   [{:keys [twist height step-size]} & block]
-  (let [b (m/extrude-linear {:height step-size} (m/union block))
+  (let [b (m/extrude-linear {:height step-size :center false} (m/union block))
         n-steps (/ (* 1 height) step-size)
         twist-step-size (/ twist n-steps)]
     (m/union
