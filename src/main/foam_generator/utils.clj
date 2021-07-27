@@ -107,6 +107,13 @@ distance `l`."
     (m/union (line p1 p2 thickness)
              (polyline (cons p2 pts) thickness))))
 
+(defn curve [r angle thickness]
+  (polyline (for [x (range 0 angle (/ angle 100))]
+              [(* r (Math/cos x)) (* r (Math/sin x)) ])
+            thickness))
+
+
+
 (defn semi-circle [r angle]
   (m/hull
    (m/polygon (cons [0 0]
@@ -147,5 +154,30 @@ distance `l`."
    (irange 0 end))
   ([] (range)))
 
+(defn extrude-linear-stepwise
+  [{:keys [step-size step-offset twist height] :as args} & block]
+  (let [e (m/union block)
+        n-steps (/ (* 1 height) step-size)
+        twist-step-size (/ twist n-steps)
+        ]
+    (for [step (next (range n-steps))
+          :when (even? step)]
+      (let [rot (- (* step twist-step-size))
+            z (* step step-size)]
+        (->> e
+             (m/rotatec [0 0 rot])
+             (m/extrude-linear {:height step-size :twist twist-step-size :center false})
+             (m/translate [0 0 z]))))))
 
-(defn cuboid [x y z fillet-r])
+(defn rotate-extrude
+  [{:keys [twist height step-size]} & block]
+  (let [b (m/extrude-linear {:height step-size} (m/union block))
+        n-steps (/ (* 1 height) step-size)
+        twist-step-size (/ twist n-steps)]
+    (m/union
+     (for [step (range n-steps)]
+       (let [rot (- (* step twist-step-size))
+             z (* step step-size)]
+         (->> b
+              (m/rotatec [0 0 rot])
+              (m/translate [0 0 z])))))))
