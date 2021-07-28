@@ -24,19 +24,38 @@
 ;; 3. Extrude up and from the side?
 
 
-(defn grid-2d
+(defn z-support-sides [cell-size center?]
+  (let [side (->> (m/square cell-size (* 4 cell-size) :center true)
+                  (m/extrude-linear {:height  (* 2 cell-size)  :center false})
+                  (m/translate [cell-size 0 (- (* 2 cell-size))]))]
+    (m/union side (m/rotatec [0 0 Math/PI] side))))
+
+(->> (z-support-sides 2 true)
+     (s/write-scad)
+     (spit "test.scad"))
+
+(defn grid-layer
   ([rows cols hole-size density center? offset?]
    (let [w (* 2 hole-size rows)
          h (* 2 hole-size cols)
-         step (/ hole-size density)]
-     (m/difference
-      (m/square w h :center center?)
-      (for [x (range (if offset? (/ step 2) 0) (+ 0.01 w (if offset? (- hole-size) 0)) step)
-            y (range (if offset? (/ step 2) 0) (+ 0.01 h (if offset? (- hole-size) 0)) step)]
-        (->> (m/square hole-size hole-size :center center?)
-             (m/translate [(if center? (- x (/ w 2)) x)
-                           (if center? (- y (/ h 2)) y)])))))))
-
+         step (/ hole-size density)
+         holes-and-supports (for [[rotate? x]
+                                  (map list
+                                       (cycle [false true])
+                                       (range (if offset? (/ step 2) 0) (+ 0.01 w (if offset? (- hole-size) 0)) step))
+                                  y (range (if offset? (/ step 2) 0) (+ 0.01 h (if offset? (- hole-size) 0)) step)]
+                              (let [tr (partial m/translate [(if center? (- x (/ w 2)) x)
+                                                             (if center? (- y (/ h 2)) y)])]
+                                [(tr (cond->> (z-support-sides hole-size center?)
+                                       rotate? (m/rotatec [0 0 (/ Math/PI 2)])))
+                                 (tr (->> (m/square hole-size hole-size :center center?)
+                                          (m/extrude-linear {:height hole-size :center false})))]))
+         holes (map second holes-and-supports)
+         supports (map first holes-and-supports)]
+     (-> (->> (m/square w h :center center?)
+              (m/extrude-linear {:height hole-size :center false}))
+         (m/difference holes)
+         (m/union supports)))))
 
 (defn grid-3d
   ([levels rows cols hole-size density center?]
@@ -45,16 +64,9 @@
          h (* 2 hole-size cols)
          z (* 2 hole-size levels)]
      (m/union
-      (concat
-       #_(for [x (range (* 3/2 hole-size) (+ 0.01 w (- (* 2 hole-size))) (* 2 hole-size))
-             y (range (* 1/2 hole-size) (+ 0.01 h (- (* 1 hole-size))) (* 2 hole-size))]
-         (->> support
-              (m/translate [(if center? (- x (/ w 2)) x)
-                            (if center? (- y (/ h 2)) y)])))
-       (for [l (range levels)]
-         (->> (grid-2d rows cols hole-size density center? (odd? l))
-              (m/extrude-linear {:height hole-size :center false})
-              (m/translate [0 0 (* 2 hole-size l)]))))))))
+      (for [l (range levels)]
+        (->> (grid-layer rows cols hole-size density center? (odd? l))
+             (m/translate [0 0 (* 2 hole-size l)])))))))
 
 (defn fast-grid-3d
   [levels rows cols cell-size]
