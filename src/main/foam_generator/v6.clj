@@ -18,10 +18,10 @@
 (def chamber-propeller-offset 1/2)
 (def mixing-chamber-height interior-height)
 (def chamber-shaft-n-hole-layers 4)
-(def chamber-intake-or 7.5)
+(def chamber-intake-or 5.35)
 (def mixing-chamber-shaft-or chamber-intake-or) ; fix
-(def chamber-mixing-levels 10)
-(def chamber-hole-size 2)
+(def chamber-mixing-levels 20)
+(def chamber-hole-size 0.85)
 (def chamber-hole-density 1/6)            ; Ratio of hole area to non-hole surface area.
 (def chamber-n-rows (/ (* interior-radius 2) chamber-hole-size))
 (def chamber-n-cols chamber-n-rows)
@@ -52,7 +52,7 @@
     (m/cylinder (+ mixing-chamber-shaft-or wall-thickness) mixing-chamber-height :center false))
 
   (def chamber-shaft-hole
-    (->> (m/square (+ (* 2 chamber-hole-size) (* 2 mixing-chamber-shaft-or)) chamber-hole-size :center false)
+    (->> (m/square (* 2 (+ wall-thickness mixing-chamber-shaft-or)) chamber-hole-size :center true)
          (m/extrude-linear {:height chamber-hole-size :center false})))
 
   (def chamber-shaft-layer-hole-pattern
@@ -63,13 +63,36 @@
   (def chamber-shaft-hole-layers
     (m/union (for [i (range chamber-shaft-n-hole-layers)]
                (->> chamber-shaft-layer-hole-pattern
-                    (m/translate [0 0 (+ chamber-hole-size (* i (* 2 chamber-hole-size)))])))))
+                    (m/translate [0 0 (+ 0.85 (* i 2 0.85))])))))
 
   (def chamber-shaft
     (m/difference chamber-shaft-outer-cylinder chamber-shaft-inner-cylinder))
 
+  (def chamber-grid-layer
+    (loop [[step & steps] (cycle [0.2 1.65])
+           lines []
+           pos (- exterior-radius)]
+      (if (>= pos exterior-radius)
+        (->> (m/union lines)
+             (m/extrude-linear {:height 0.85 :center false}))
+        (recur steps
+               (cond-> lines
+                 (= step 1.65) (conj (u/polyline [[pos (- exterior-radius)]
+                                                  [pos exterior-radius]]
+                                                 (/ step 2))))
+               (+ pos step)))))
+
+  (def chamber-grid-layers
+    (m/render
+     (m/union
+      (for [z (range chamber-mixing-levels)]
+        (cond->> (->> chamber-grid-layer
+                      (m/translate [0 0 (* 3/2 z)]))
+          (odd? z) (m/rotatec [0 0 (/ Math/PI 2)]))))))
+
+
   (def chamber-mixing-grid
-    (-> (g/grid-3d chamber-mixing-levels chamber-n-rows chamber-n-cols chamber-hole-size chamber-hole-density true)
+    (-> chamber-grid-layers
         (m/intersection container-outer-cylinder)
         (m/difference chamber-shaft-inner-cylinder)
         (m/render)))
@@ -98,7 +121,6 @@
          (m/union chamber-output)
          (m/translate [0 0 interior-height])))
 
-
   ;; Full assembly
 
   (def full-assembly
@@ -108,3 +130,29 @@
 (->> full-assembly
      (s/write-scad)
      (spit "test.scad"))
+
+
+(comment
+
+  (let [support (->> (m/square (* 2 exterior-radius) 1.65 :center true)
+                     (m/extrude-linear {:height 10 :center false}))]
+    (->> (m/union (m/translate [0 (- exterior-radius) 0] support)
+                  (m/translate [0 exterior-radius 0] support)
+                  (m/translate [0 0 10] chamber-grid-layer))
+         (s/write-scad)
+         (spit "test.scad")))
+
+  (->> chamber-grid-layer
+       (m/translate [0 0 ]))
+
+  (def chamber-grid-layers
+    (m/render
+     (m/union
+      (for [z (range 40)]
+        (cond->> (->> chamber-grid-layer
+                      (m/translate [0 0 (* 3/2 z)]))
+          (odd? z) (m/rotatec [0 0 (/ Math/PI 2)]))))))
+
+
+
+  )
