@@ -1,141 +1,160 @@
 (ns main.foam-generator.core
   (:require
    [foam-generator.utils :as u]
+   [foam-generator.params :as p]
    [scad-clj.model :as m]
-   [scad-clj.scad :as s]))
+   [scad-clj.scad :as s]
+   [scad-paths.core :as paths
+    :refer [context forward hull left right up down roll backward defmodel no-op translate
+            lookup-transform rotate transform]]))
 
-(Math/round 1.1)
-(comment
+(def ctx
+  {:fn 20 :curve-radius 10})
 
-  (let [x-length 36
-        y-length 36
-        z-length 5
-        hole-x 1
-        hole-y 1
-        hole-z 1
-        line-thickness 1
-        x-line (u/polyline [[0 0] [x-length 0]] (/ line-thickness 2))
-        y-line (u/polyline [[0 0] [0 y-length]] (/ line-thickness 2))
-        grid (->> (m/union
-                   (concat
-                    (for [x (range 0 x-length (+ line-thickness hole-x))]
-                      (->> y-line (m/translate [x 0])))
-                    (for [y (range 0 x-length (+ line-thickness hole-y))]
-                      (->> x-line (m/translate [0 y])))))
-                  (m/extrude-linear {:height 1 :center false}))
+(defmodel air-hose-plug
+  (assoc ctx :fn 50)
+  (let [c1o (m/circle p/plug-or)
+        c1i (m/circle p/plug-ir)
 
-        all-grids (m/union
-                   (for [z (range 0 z-length (+ line-thickness hole-z))]
-                     (cond->> grid
-                       true (m/translate [0 0 z])
-                       (even? (Math/round (float (/ z 2)))) (m/translate [hole-x hole-y 0]))))
-        cylinder (m/union
-                  (m/intersection
-                   (m/translate [(- (/ x-length 2)) (- (/ y-length 2)) 0] all-grids)
-                   (m/cylinder 15 z-length :center false))
-                  #_(m/difference
-                     (m/cylinder 15 z-length :center false)
-                     (m/cylinder 14 z-length :center false)))]
-    (->> cylinder
-         (s/write-scad)
-         (spit "test.scad")))
+        c2o (m/circle p/plug-third-segment-radius)
+        c2i (m/circle (- p/plug-third-segment-radius 3/2))
 
-  )
+        bulge-circle (m/circle p/plug-bulge-or)]
+    [[(context :shape c2o) (context :shape c2i)]
+     (forward :length p/plug-third-segment-length)
+     [(context :shape c1o) (context :shape c1i)]
+     (forward :length p/plug-second-hull-length)
+     (hull)
+     (forward :length p/plug-second-segment-length)
+     (forward :length p/plug-bulge-hull-length)
+     [(context :shape bulge-circle)]
+     (forward :length p/plug-bulge-segment-length)
+     (hull)
+     [(context :shape c1o)]
+     (forward :length p/plug-bulge-hull-length)
+     (hull)
+     (forward :length p/plug-first-segment-length)]))
 
 
-(defn flat-wedge [o r angle]
-  (m/difference
-   (u/semi-circle r angle)
-   (m/polygon [[0 0] [0 o]  [o 0]])))
+(defmodel tube-connector
+  (assoc ctx :fn 100)
+  (let [outer-circle-medium (m/circle p/tubing-ir)
+        outer-circle-small (m/circle (- p/tubing-ir 1/2))
+        inner-circle (m/circle (- p/tubing-ir 1/2 3/2))]
+    (into []
+          cat
+          (for [x (range 3)]
+            [[(context :shape outer-circle-medium) (context :shape inner-circle)]
+             (forward :length 1)
+             [(context :shape outer-circle-small)]
+             (forward :length 4)
+             (hull)]))))
 
-(defn reservoir-side [o r h]
-  (->> (u/polyline [[o 0]
-                    [r 0] [(+ r (* h (Math/cos (/ Math/PI 4)))) (* h (Math/sin (/ Math/PI 4)))]
-                    [(* h (Math/cos (/ Math/PI 4))) (+ r (* h (Math/sin (/ Math/PI 4))))]
-                    [0 r]
-                    [0 o]
-                    [o 0]]
-                   1/2)))
+(defmodel intake-plate
+  ctx
+  (let [c (m/circle p/intake-or)]
+    [[(context :shape c)]
+     (forward :length p/intake-plate-thickness)
+     [:segment
+      (vec
+       (for [x (range 3)]
+         (let [d (* x (/ (* 2 Math/PI) 3))]
+           [:branch [(translate :x (* 10 (Math/cos d)) :y (* 10 (Math/sin d)))
+                     [:segment (if (zero? x) air-hose-plug tube-connector)]]])))]]))
 
-(defn reservoir-walls [o r h]
-  (m/union (u/polyline [[o 0]
-                        [r 0]
-                        [(+ r (* h (Math/cos (/ Math/PI 4)))) (* h (Math/sin (/ Math/PI 4)))]]
-                       1/2)
-           (u/polyline [[o 0]
-                        [0 o]
-                        [0 r]
-                        [(* h (Math/cos (/ Math/PI 4))) (+ r (* h (Math/sin (/ Math/PI 4))))]]
-                       1/2)))
+(defmodel squeeze-trigger
+  (assoc ctx :curve-radius 40)
+  (let [shape (m/circle 3)]
+    [[(context :shape shape)]
+     (forward :length 10)
+     (left :curve-radius 3)
+     (forward :length 60)
+     (left :curve-radius 3)
+     (forward :length 20)
+     (hull :n-segments 3)
+     (left :curve-radius 3)
+     (roll :angle Math/PI)
+     (left :angle (/ Math/PI 6))
+     [(context :curve-radius 60)]
+     (right :angle (/ Math/PI 6))
+     (left :angle (/ Math/PI 3) :curve-radius 4)]))
 
-(Math/atan (/ Math/PI 20))
+(defmodel gun-body
+  ctx
+  (let [main-shape (m/minkowski (m/square 29 15)
+                                (m/circle 3))]
+    [[:branch
+      [(rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
+       [:segment air-hose-plug]]]
+     [(context :shape main-shape :curve-radius 35/2)]
+     (rotate :axis [0 1 0] :angle (/ Math/PI 8))
+     #_(rotate :axis [0 1 0] :angle (/ Math/PI 6))
+     (forward :length 90)
+     (right :angle (- (/ Math/PI 2) (/ Math/PI 8)))
+     [(context :shape (m/circle 15))]
+     (forward :length 130)
+     (hull)]))
 
-(defn foam-chamber [bottom-width radius height offset]
-  (let [line (m/cube 1 0.5 0.5 :center true)
-        horizontal-hole-pattern
-        (m/union
-         (for [r (range (* offset (Math/atan (/ 1 radius))) (/ Math/PI 2) (/ Math/PI 3 radius))]
-           (->> line (u/translatev r radius))))
+(defmodel trigger
+  ctx
+  (let [shape (m/square 8 6)]
+    [[(context :shape shape :curve-radius 15)]
+     (rotate :axis [0 1 0] :angle (/ Math/PI 8))
+     (forward :length 10 :gap false)
+     [:branch
+      [(right :angle (/ Math/PI 2) :curve-radius 4 :gap false)
+       (forward :length 10)]]
+     (forward :length 60)
+     (right :angle (- (/ Math/PI 2) (/ Math/PI 8))
+            :curve-radius 4)
+     (forward :length (- 15 3/2))
+     (right :angle (* 2 Math/PI) :curve-radius 4)
+     (right :curve-radius 4)
+     (right :angle (/ Math/PI 8) :curve-radius 40)
+     (left :angle (/ Math/PI 3.8) :curve-radius 60)]))
 
-        vertical-hole-pattern
-        (m/union
-         (for [z (range (* offset 1) height 1)]
-           (->> horizontal-hole-pattern
-                (m/translate [0 0 z]))))
+(m/union trigger gun-body)
 
-        fluid-cylinder
-        (m/difference
-         (->> (flat-wedge bottom-width radius (/ Math/PI 2))
-              (u/shell 0.5 false)
-              (m/extrude-linear {:height height :center false}))
-         vertical-hole-pattern)]
-    (m/difference (m/union fluid-cylinder #_bottom-surface) #_bottom-cut)))
+(defn cosine-hill [w h n-steps]
+  (m/polygon
+   (for [step (range n-steps)]
+     (let [x (- (* step (/ w n-steps)) (/ w 2))
+           y (* (/ h 2) (Math/cos (* step (/ (* 2 Math/PI) n-steps))))]
+       [x y]))))
 
-(defn foam-liquid-holder [r h l]
-  (->> (u/polyline [[r 0] [(+ r (* h (Math/cos (/ Math/PI 4)))) (* h (Math/sin (/ Math/PI 4)))]
-                    [(* h (Math/cos (/ Math/PI 4))) (+ r (* h (Math/sin (/ Math/PI 4))))]
-                    [0 r]]
-                   1/2)
-       (m/extrude-linear {:height l :center false})))
+(defmodel intake
+  ctx
+  [#_[:branch
+    [(rotate :axis [0 1 0] :angle Math/PI)
+     [:segment air-hose-plug]]]
+   [(context :shape (cosine-hill 12 3 50))]
+   (forward :length 0.1)
+   (forward :length 20)
+   (left :curve-radius 6)
+   (up :curve-radius 3/2)
+   (forward :length 20)
+   (up :curve-radius 3/2)
+   #_[:branch
+    [(left :curve-radius 6)
+     (forward :length (- 20 3))
+     (up :curve-radius 3/2)
+     (forward :length 10)
+     (down :curve-radius 3/2)
+     (forward :length 5)]]
+   #_[:branch
+    [(right :curve-radius 6)]]])
 
-(defn output-hull [o r0 r1 h]
-  (m/hull (->> (flat-wedge o r0 (/ Math/PI 2))
-               (m/translate [(- (/ r0 2)) (- (/ r0 2)) 0])
-               (m/extrude-linear {:height 1 :center false}))
-          (->> (m/cylinder r1 2 :center false)
-               (m/translate [0 0 h]))))
+(defmodel tmp
+  ctx
+  [[(context :shape (cosine-hill 12 3 50))
+    (context :shape (cosine-hill 6 3/2 50))]
+   (forward :length 50)])
 
-(defn output-nozzle [o r0 r1 h]
-  (->> (m/difference
-        (output-hull o r0 r1  h)
-        (output-hull o (- r0 1) (- r1 1) h))
-       (m/translate [(/ r0 2) (/ r0 2) 0])))
-
-(defn foam-mesh [bottom-width n-layers reservoir-length starting-radius]
-  (m/union
-   (for [x (range starting-radius (+ starting-radius n-layers))]
-     (if (odd? x)
-       (foam-chamber bottom-width x reservoir-length 1)
-       (foam-chamber bottom-width x reservoir-length 5/3)))))
-
-(let [bottom-width 10
-      out-nozzle (output-nozzle bottom-width 32 10 -25)
-      reservoir-length 2
-      top-side (->> (reservoir-side bottom-width 38 40))
-      bottom-side (->> (reservoir-side bottom-width 38 40)
-                       (m/hull)
-                       (m/extrude-linear {:height 5 :center false})
-                       (m/translate [0 0 reservoir-length]))]
-  (->> (m/union
-        out-nozzle
-        bottom-side
-        (->> (reservoir-walls bottom-width 38 40)
-             (m/extrude-linear {:height reservoir-length :center false}))
-        (m/difference (->> top-side
-                           (m/hull)
-                           (m/extrude-linear {:height 1 :center false}))
-                      (->> (flat-wedge bottom-width 31 (/ Math/PI 2))
-                           (m/extrude-linear {:height 2 :center false})))
-        (foam-mesh bottom-width 20 reservoir-length 12))
-       (s/write-scad (m/use "scad-utils/morphology.scad"))
-       (spit "test.scad")))
+(defmodel living-spring
+  ctx
+  (let [angle (/ Math/PI 4)
+        r 40
+        shape (m/square 2 10)]
+    [[(context :shape shape)]
+     (rotate :axis [0 1 0] :angle (- (/ angle 2)))
+     (right :curve-radius r :angle angle)]))

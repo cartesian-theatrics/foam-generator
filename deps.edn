@@ -1,6 +1,7 @@
 {:paths ["src/main" "resources"]
  :deps  {org.clojure/clojure   {:mvn/version "1.11.0-alpha1"}
          scad-tarmi/scad-tarmi {:mvn/version "0.6.0"}
+         scad-paths/scad-paths {:local/root "../scad-paths"}
          metosin/malli         {:mvn/version "0.5.1"}
          scad-app/scad-app     {:mvn/version "1.0.0"}
          scad-clj/scad-clj     {:mvn/version "0.5.3"}}
