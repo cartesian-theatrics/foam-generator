@@ -9,10 +9,13 @@
             lookup-transform rotate transform]]))
 
 (def ctx
-  {:fn 20 :curve-radius 10})
+  {:fn 10 :curve-radius 10})
+
+(def pi Math/PI)
+(def hpi (/ Math/PI 2))
 
 (defmodel air-hose-plug
-  (assoc ctx :fn 50)
+  (assoc ctx :fn 10)
   (let [c1o (m/circle p/plug-or)
         c1i (m/circle p/plug-ir)
 
@@ -37,7 +40,7 @@
 
 
 (defmodel tube-connector
-  (assoc ctx :fn 100)
+  (assoc ctx :fn 10)
   (let [outer-circle-medium (m/circle p/tubing-ir)
         outer-circle-small (m/circle (- p/tubing-ir 1/2))
         inner-circle (m/circle (- p/tubing-ir 1/2 3/2))]
@@ -109,40 +112,64 @@
             :curve-radius 4)
      (forward :length (- 15 3/2))
      (right :angle (* 2 Math/PI) :curve-radius 4)
-     (right :curve-radius 4)
+     (right :curve-radius 4 :angle (/ Math/PI 2.3))
      (right :angle (/ Math/PI 8) :curve-radius 40)
      (left :angle (/ Math/PI 3.8) :curve-radius 60)]))
 
 (m/union trigger gun-body)
 
+(defmodel spring
+  (assoc ctx :fn 100)
+  (let [a (/ pi 8)
+        width 10
+        n-turns 4
+        thickness 1]
+    (conj
+     (into [[(context :shape (m/square thickness width))]
+            (translate :x (/ thickness 2) :z thickness)
+            (forward :length width)
+            (rotate :axis [0 1 0] :angle pi)
+            (forward :length width)
+            (left :angle (- pi a) :curve-radius 1/2)]
+           cat
+           (for [_ (range n-turns)]
+             [(forward :length (- (/ width (Math/cos a)) thickness) :angle (* a 2))
+              (right :angle (- pi (* a 2)) :curve-radius (/ thickness 2))
+              (roll :angle pi)]))
+     (left :angle a :curve-radius (/ thickness 2))
+     (forward :length 10))))
+
 (defn cosine-hill [w h n-steps]
   (m/polygon
    (for [step (range n-steps)]
-     (let [x (- (* step (/ w n-steps)) (/ w 2))
-           y (* (/ h 2) (Math/cos (* step (/ (* 2 Math/PI) n-steps))))]
+     (let [step step
+           x (- (* step (/ w (dec n-steps))) (/ w 2))
+           y (* (/ h 2) (Math/cos (* step (/ (* 2 Math/PI) (dec n-steps)))))]
        [x y]))))
 
 (defmodel intake
   ctx
   [#_[:branch
-    [(rotate :axis [0 1 0] :angle Math/PI)
+    [(rotate :axis [0 1 0] :angle pi)
      [:segment air-hose-plug]]]
-   [(context :shape (cosine-hill 12 3 50))]
-   (forward :length 0.1)
-   (forward :length 20)
-   (left :curve-radius 6)
-   (up :curve-radius 3/2)
-   (forward :length 20)
-   (up :curve-radius 3/2)
+   [(context :shape (m/circle p/plug-third-segment-radius))
+    (context :shape (m/circle (- p/plug-third-segment-radius 3/2)))]
+   (forward :length 1)
+   [(context :shape (cosine-hill 12 3 50)) (context :shape nil)]
    #_[:branch
-    [(left :curve-radius 6)
-     (forward :length (- 20 3))
-     (up :curve-radius 3/2)
-     (forward :length 10)
-     (down :curve-radius 3/2)
-     (forward :length 5)]]
-   #_[:branch
-    [(right :curve-radius 6)]]])
+    [(up :curve-radius 5)
+     (down :curve-radius 5)]]
+   (translate :y 4)
+   (forward :length 10)
+   (hull)
+   (forward :length 20)
+   (down :angle Math/PI :curve-radius 3/2)
+   (forward :length 20)
+   (forward :length 1)
+   (translate :y 4 :z -9)
+   [:segment
+    (let [[s1 s2 & segs] (:path-spec (meta tube-connector))]
+      (vec (list* s1 s2 (hull :n-segments 2) nil)))]])
 
 (defmodel tmp
   ctx
