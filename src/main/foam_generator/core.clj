@@ -111,17 +111,26 @@
   (set :shape (m/circle 15))
   (forward :length 130))
 
-(defmodel valve-cap
+(defmodel valve
   :fn 100
-  (model :shape (m/circle 10) :mask? false :name :body :order 0)
-  (model :shape (binding [m/*fn* 100] (u/ovol 9 2)) :mask? true :name :mask :order 1)
-  (set :fn 100)
+  (model :shape (m/circle 2) :mask? false :name :body :order 0 :fn 100)
+  (forward :length 2)
+  (set :shape (m/union (m/circle 2)
+                       (m/intersection (->> (m/square 5 2)
+                                            (m/translate [5/2 0]))
+                                       (m/circle 5))))
+  (forward :length 15)
+  (set :shape (m/circle 10))
+  (model :shape (binding [m/*fn* 100] (u/ovol 9 2)) :mask? true :name :mask :order 1 :fn 100)
   (branch
    (set :shape (m/square 2 19) :to [:body])
+   (translate :z 2)
    (forward :length 4 :order 2 :to [:body]))
+  (forward :length 2 :to [:body] :fn 5)
   (forward :length 4 :to [:body])
-  (translate :z 4 :to [:mask])
+  (translate :z 6 :to [:mask])
   (spin :angle (* 2 pi) :to [:mask]))
+
 
 (defmodel trigger
   :fn 10
@@ -139,8 +148,7 @@
   (right :angle (* 2 Math/PI) :curve-radius 4)
   (right :curve-radius 4 :angle (/ Math/PI 2.3))
   (right :angle (/ Math/PI 8) :curve-radius 40)
-  (left :angle (/ Math/PI 3.8) :curve-radius 60)
-  )
+  (left :angle (/ Math/PI 3.8) :curve-radius 60))
 
 (defn cosine-hill [w h n-steps]
   (m/polygon
