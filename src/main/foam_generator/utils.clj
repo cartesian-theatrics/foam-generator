@@ -27,6 +27,16 @@ distance `l`."
      (* 2 (Math/sqrt (- (Math/pow l 2)
                         (* 0.25 (Math/pow (- dl ds) 2)))))))
 
+(defn ovol
+  [rx ry]
+  (let [n-steps (or m/*fn* 100)]
+    (m/polygon
+     (for [x (range n-steps)]
+       (let [d (* x (/ (* 2 Math/PI) n-steps))]
+         [(* rx (Math/cos d))
+          (* ry (Math/sin d))])))))
+
+
 (defn radius-from-circumference [c]
   (/ c (* Math/PI 2)))
 
@@ -187,3 +197,7 @@ distance `l`."
          (->> b
               (m/rotatec [0 0 rot])
               (m/translate [0 0 z])))))))
+
+(defn arc
+  [a r]
+  (for ))

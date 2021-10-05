@@ -112,9 +112,13 @@
   (forward :length 130))
 
 (defmodel valve-cap
-  :fn 10
-  (model :shape (m/circle 10) :mask? false :name :body)
-  (model :shape (u/ovol 9 2) :mask? true :name :mask)
+  :fn 100
+  (model :shape (m/circle 10) :mask? false :name :body :order 0)
+  (model :shape (binding [m/*fn* 100] (u/ovol 9 2)) :mask? true :name :mask :order 1)
+  (set :fn 100)
+  (branch
+   (set :shape (m/square 2 19) :to [:body])
+   (forward :length 4 :order 2 :to [:body]))
   (forward :length 4 :to [:body])
   (translate :z 4 :to [:mask])
   (spin :angle (* 2 pi) :to [:mask]))
@@ -160,8 +164,7 @@
   (forward :length 10)
   (hull)
   (forward :length 20)
-  (branch
-   (forward :length 20))
+  (branch (forward :length 20))
   (down :angle Math/PI :curve-radius 3)
   (forward :length 20)
   (forward :length 1)
