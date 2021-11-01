@@ -5,9 +5,9 @@
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
    [scad-paths.core :as paths
-    :refer [context forward hull left right up down roll backward defmodel no-op translate
-            model branch segment set
-            ctx spin lookup-transform rotate transform]]))
+    :refer [forward hull left right up down roll backward defmodel translate
+            model branch segment set arc
+            spin lookup-transform rotate transform]]))
 
 (def cx
   {:fn 10 :curve-radius 10})
@@ -126,11 +126,30 @@
    (set :shape (m/square 2 19) :to [:body])
    (translate :z 2)
    (forward :length 4 :order 2 :to [:body]))
-  (forward :length 2 :to [:body] :fn 5)
+  (forward :length 2 :to [:body] :fn 15)
   (forward :length 4 :to [:body])
   (translate :z 6 :to [:mask])
   (spin :angle (* 2 pi) :to [:mask]))
 
+(defmodel arcs
+  (model :shape (m/square 1 3) :fn 5)
+  (rotate :axis :x :angle (/ pi 2))
+  (translate :y 3/2)
+  (segment
+   (for [_ (range 10)]
+     (segment
+      (rotate :axis :y :angle (/ (* 2 pi) 10))
+      (branch (arc :side-length 10 :curve-radius 7))))))
+
+(defmodel resistance-wheel
+  (model :shape (m/difference (m/circle 10) (m/circle 9))
+         :fn 10
+         :mask? false
+         :name :body)
+  (branch
+   (segment arcs))
+  (branch
+   (forward :length 3)))
 
 (defmodel trigger
   :fn 10
@@ -186,7 +205,7 @@
         n-turns 4
         thickness 1]
     (conj
-     (into [[(context :shape (m/square thickness width))]
+     (into [[(model :shape (m/square thickness width))]
             (translate :x (/ thickness 2) :z thickness)
             (forward :length width)
             (rotate :axis [0 1 0] :angle pi)
@@ -199,3 +218,159 @@
               (roll :angle pi)]))
      (left :angle a :curve-radius (/ thickness 2))
      (forward :length 10))))
+
+
+(def motor-r (/ 48.8 2))
+(def motor-l 20)
+(def motor-axle-w 5)
+(def motor-axle-r 7/2)
+(def motor-bolt-r 2.2)
+
+(defmodel mount-bracket
+
+  (model :shape (m/union (m/square (+ 4 (* 2 motor-bolt-r)) 3))
+         :name :body)
+
+  (model :shape (m/circle 2) :name :mask :mask? true :order 1)
+
+  (set :curve-radius (+ motor-r (/ 9 2)))
+
+  (translate :x (+ motor-r (- (/ (+ 4 (* 2 motor-bolt-r))
+                                 2)
+                              0.1)))
+  (rotate :axis :x :angle (/ pi 2))
+  (translate :y 3/2)
+  (rotate :axis :x :angle pi)
+  (left :side-length 4 :gap true)
+  (rotate :axis :x :angle pi)
+  (left :side-length 4 :to [:body])
+  (left :side-length 4 :to [:mask] :gap true)
+  (branch
+   (rotate :axis :x :angle (- (/ pi 2)))
+   (forward :length 3.01 :center true :to [:mask]))
+  (left :side-length 6 :to [:body])
+  (left :side-length 6 :to [:mask] :gap true)
+  (branch
+   (rotate :axis :x :angle (- (/ pi 2)))
+   (forward :length 3.01 :center true :to [:mask]))
+  (left :side-length 4 :to [:body]))
+
+(defmodel motor
+  (model :shape (m/circle motor-r) :name :body :order 0)
+  (set :fn 50)
+  (branch
+   (segment mount-bracket))
+
+  (branch
+   (rotate :axis :y :angle pi)
+   (translate :z (- 3))
+   (segment mount-bracket))
+
+  (branch
+   (translate :y (- motor-r 12))
+   (rotate :axis :y :angle pi)
+   (set :shape (m/circle 6) :to [:body])
+   (forward :length 2)
+   (set :shape (m/circle motor-axle-r))
+   (forward :length 2)
+   (set :shape (m/intersection (m/circle motor-axle-r) (m/square motor-axle-w motor-axle-r)))
+   (forward :length 5))
+
+  (forward :length motor-l :to [:body]))
+
+(defmodel motor-mount
+  (model :shape
+         (m/union (m/intersection (m/circle (+ 2 motor-r))
+                                  (->> (m/square (+ 4 (* 2 motor-r)) 32)
+                                       (m/translate [0 5])))
+
+                  (m/difference
+                   (m/intersection
+                    (->> (cosine-hill (+ 10 (* 6 motor-r))
+                                      (+ 10 (* 2 motor-r))
+                                      50)
+                         (m/minkowski (m/circle 2.5)))
+                    (->> (m/square 200 32)
+                         (m/translate [0 5])))))
+
+
+         :name :body
+         :order 0)
+
+  (model :shape (m/circle motor-r)
+         :mask? true
+         :name :mask
+         :order 1)
+
+  (rotate :x (- (/ pi 2)))
+  (translate :y (- 21) :z (- 3/2))
+
+  (branch
+   (segment mount-bracket))
+
+  (branch
+   (rotate :y pi)
+   (translate :z (- 3))
+   (segment mount-bracket))
+
+  (branch
+   (translate :y (- motor-r 12))
+   (rotate :y pi)
+   (model :shape (m/circle 6) :name :mask)
+   (backward :length 3.01 :to [:mask]))
+
+  (translate :y 3/2 :to [:mask])
+  (backward :length motor-l :to [:mask])
+  (forward :length 3 :to [:body]))
+
+(defmodel spin-joint
+  (model :shape (cosine-hill (* 5 motor-axle-w)
+                             (* 2.7 motor-axle-r)
+                             50)
+         :name :body
+         :mask? false
+         :order 0)
+
+  (model :shape (m/intersection
+                 (m/circle motor-axle-r)
+                 (m/square motor-axle-w (* 2 motor-axle-r)))
+         :name :mask
+         :mask? true
+         :order 1)
+
+  (rotate :y (/ pi 2))
+  (rotate :axis [1 0 0] :angle (- pi))
+  (translate :z (- 4) :y (- 4))
+  (forward :length 8))
+
+(defmodel rotater
+  (model :shape (m/union (m/square 8 3)
+                         (->> (m/square 3 6)
+                              (m/translate [-2.5 3/2])))
+         :curve-radius 4
+         :name :body)
+  (set :fn 50)
+  (forward :length 80)
+
+  #_(branch
+     (rotate :z (/ pi 2))
+     (rotate :y (/ pi 2))
+     (translate :y 2.5)
+     (segment motor-mount))
+
+  (set :shape nil :to [:mask])
+  (forward :length 80)
+  (left :curve-radius 4)
+  (forward :length (/ 248 2))
+  (branch
+   (segment spin-joint))
+  (set :shape nil :to [:mask])
+  (forward :length (/ 248 2))
+  (left :curve-radius 4)
+  (forward :length 160)
+  (left :curve-radius 4)
+  (forward :length 248)
+  (left :curve-radius 4))
+
+(binding [m/*fs* 1]
+  (m/cylinder 10 20))
