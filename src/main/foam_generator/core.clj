@@ -9,14 +9,10 @@
             model branch segment set arc
             spin lookup-transform rotate transform]]))
 
-(def cx
-  {:fn 10 :curve-radius 10})
-
 (def pi Math/PI)
 (def hpi (/ Math/PI 2))
 
 (defmodel air-hose-plug
-  :fn 10
   (segment
    (let [c1o (m/circle p/plug-or)
          c1i (m/circle p/plug-ir)
@@ -27,6 +23,7 @@
          bulge-circle (m/circle p/plug-bulge-or)]
      [(model :name :body :shape c2o :mask? false)
       (model :name :mask :shape c2i :mask? true)
+      (set :fn 120)
 
       (backward :to [:mask] :length 0.01)
       (forward :to [:mask] :length 0.01)
@@ -50,13 +47,13 @@
       (forward :length (+ 0.01 p/plug-first-segment-length) :to [:mask])])))
 
 (defmodel tube-connector
-  :fn 100
   (segment
    (let [outer-circle-medium (m/circle p/tubing-ir)
          outer-circle-small (m/circle (- p/tubing-ir 1/2))
          inner-circle (m/circle (- p/tubing-ir 1/2 3/2))]
      (into [(model :name :body :shape outer-circle-medium :mask? false)
-            (model :name :mask :shape inner-circle :mask? true)]
+            (model :name :mask :shape inner-circle :mask? true)
+            (set :fn 100)]
            cat
            (for [_ (range 3)]
              [(set :shape outer-circle-medium :to [:body])
@@ -68,14 +65,13 @@
               (hull)])))))
 
 (defmodel squeeze-trigger
-  :fn 10
   (model :shape (m/circle 3) :name :body :mask? false)
+  (set :fn 100)
   (forward :length 10)
   (left :curve-radius 3)
   (forward :length 60)
   (left :curve-radius 3)
   (forward :length 20)
-  (hull :n-segments 3)
   (left :curve-radius 3)
   (roll :angle Math/PI)
   (left :angle (/ Math/PI 6))
@@ -84,23 +80,25 @@
   (left :angle (/ Math/PI 3) :curve-radius 4))
 
 (defmodel gun-body
-  :fn 100
   (model :shape (m/minkowski (m/square 35 15) (m/circle 3))
          :name :body
          :curve-radius 41/2)
-
   (model :shape nil :name :mask :mask? true)
+  (set :fn 100)
 
   (branch
+   :from :body
    (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
    (segment air-hose-plug))
 
   (branch
+   :from :body
    (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
    (translate :x 14 :z 0)
    (segment tube-connector))
 
   (branch
+   :from :body
    (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
    (translate :x (- 14) :z 0)
    (segment tube-connector))
@@ -112,8 +110,8 @@
   (forward :length 130))
 
 (defmodel valve
-  :fn 100
   (model :shape (m/circle 2) :mask? false :name :body :order 0 :fn 100)
+  (set :fn 100)
   (forward :length 2)
   (set :shape (m/union (m/circle 2)
                        (m/intersection (->> (m/square 5 2)
@@ -123,6 +121,7 @@
   (set :shape (m/circle 10))
   (model :shape (binding [m/*fn* 100] (u/ovol 9 2)) :mask? true :name :mask :order 1 :fn 100)
   (branch
+   :from :body
    (set :shape (m/square 2 19) :to [:body])
    (translate :z 2)
    (forward :length 4 :order 2 :to [:body]))
@@ -132,14 +131,15 @@
   (spin :angle (* 2 pi) :to [:mask]))
 
 (defmodel arcs
-  (model :shape (m/square 1 3) :fn 5)
+  (model :shape (m/square 1 3) :fn 5 :name :body)
+  (set :fn 100)
   (rotate :axis :x :angle (/ pi 2))
   (translate :y 3/2)
   (segment
    (for [_ (range 10)]
      (segment
       (rotate :axis :y :angle (/ (* 2 pi) 10))
-      (branch (arc :side-length 10 :curve-radius 7))))))
+      (branch :from :body (arc :side-length 10 :curve-radius 7))))))
 
 (defmodel resistance-wheel
   (model :shape (m/difference (m/circle 10) (m/circle 9))
@@ -147,8 +147,10 @@
          :mask? false
          :name :body)
   (branch
+   :from :body
    (segment arcs))
   (branch
+   :from :body
    (forward :length 3)))
 
 (defmodel trigger
@@ -157,6 +159,7 @@
   (rotate :axis [0 1 0] :angle (/ Math/PI 8))
   (forward :length 10 :gap false)
   (branch
+   :from :body
    (right :angle (/ Math/PI 2) :curve-radius 4 :gap false)
    (forward :length 10))
 
@@ -178,7 +181,6 @@
        [x y]))))
 
 (defmodel intake
-  :fn 10
   (model :shape (m/circle p/plug-third-segment-radius) :mask? false :name :body)
   (model :shape (m/circle (- p/plug-third-segment-radius 3/2)) :mask? false :name :mask)
 
@@ -191,7 +193,7 @@
   (forward :length 10)
   (hull)
   (forward :length 20)
-  (branch (forward :length 20))
+  (branch :from :body (forward :length 20))
   (down :angle Math/PI :curve-radius 3)
   (forward :length 20)
   (forward :length 1)
@@ -199,26 +201,25 @@
   (segment tube-connector))
 
 (defmodel spring
-  (assoc cx :fn 100)
   (let [a (/ pi 8)
         width 10
         n-turns 4
         thickness 1]
-    (conj
-     (into [[(model :shape (m/square thickness width))]
-            (translate :x (/ thickness 2) :z thickness)
-            (forward :length width)
-            (rotate :axis [0 1 0] :angle pi)
-            (forward :length width)
-            (left :angle (- pi a) :curve-radius 1/2)]
-           cat
-           (for [_ (range n-turns)]
-             [(forward :length (- (/ width (Math/cos a)) thickness) :angle (* a 2))
-              (right :angle (- pi (* a 2)) :curve-radius (/ thickness 2))
-              (roll :angle pi)]))
-     (left :angle a :curve-radius (/ thickness 2))
-     (forward :length 10))))
-
+    (segment
+     (conj
+      (into [(model :shape (m/square thickness width))
+             (translate :x (/ thickness 2) :z thickness)
+             (forward :length width)
+             (rotate :axis [0 1 0] :angle pi)
+             (forward :length width)
+             (left :angle (- pi a) :curve-radius 1/2)]
+            cat
+            (for [_ (range n-turns)]
+              [(forward :length (- (/ width (Math/cos a)) thickness) :angle (* a 2))
+               (right :angle (- pi (* a 2)) :curve-radius (/ thickness 2))
+               (roll :angle pi)]))
+      (left :angle a :curve-radius (/ thickness 2))
+      (forward :length 10)))))
 
 (def motor-r (/ 48.8 2))
 (def motor-l 20)
@@ -246,11 +247,13 @@
   (left :side-length 4 :to [:body])
   (left :side-length 4 :to [:mask] :gap true)
   (branch
+   :from :body
    (rotate :axis :x :angle (- (/ pi 2)))
    (forward :length 3.01 :center true :to [:mask]))
   (left :side-length 6 :to [:body])
   (left :side-length 6 :to [:mask] :gap true)
   (branch
+   :from :body
    (rotate :axis :x :angle (- (/ pi 2)))
    (forward :length 3.01 :center true :to [:mask]))
   (left :side-length 4 :to [:body]))
@@ -259,14 +262,17 @@
   (model :shape (m/circle motor-r) :name :body :order 0)
   (set :fn 50)
   (branch
+   :from :body
    (segment mount-bracket))
 
   (branch
+   :from :body
    (rotate :axis :y :angle pi)
    (translate :z (- 3))
    (segment mount-bracket))
 
   (branch
+   :from :body
    (translate :y (- motor-r 12))
    (rotate :axis :y :angle pi)
    (set :shape (m/circle 6) :to [:body])
@@ -306,14 +312,17 @@
   (translate :y (- 21) :z (- 3/2))
 
   (branch
+   :from :body
    (segment mount-bracket))
 
   (branch
+   :from :body
    (rotate :y pi)
    (translate :z (- 3))
    (segment mount-bracket))
 
   (branch
+   :from :body
    (translate :y (- motor-r 12))
    (rotate :y pi)
    (model :shape (m/circle 6) :name :mask)
@@ -353,16 +362,18 @@
   (forward :length 80)
 
   #_(branch
-     (rotate :z (/ pi 2))
-     (rotate :y (/ pi 2))
-     (translate :y 2.5)
-     (segment motor-mount))
+   :from :body
+   (rotate :z (/ pi 2))
+   (rotate :y (/ pi 2))
+   (translate :y 2.5)
+   (segment motor-mount))
 
   (set :shape nil :to [:mask])
   (forward :length 80)
   (left :curve-radius 4)
   (forward :length (/ 248 2))
   (branch
+   :from :body
    (segment spin-joint))
   (set :shape nil :to [:mask])
   (forward :length (/ 248 2))
@@ -371,6 +382,3 @@
   (left :curve-radius 4)
   (forward :length 248)
   (left :curve-radius 4))
-
-(binding [m/*fs* 1]
-  (m/cylinder 10 20))

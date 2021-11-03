@@ -197,7 +197,3 @@ distance `l`."
          (->> b
               (m/rotatec [0 0 rot])
               (m/translate [0 0 z])))))))
-
-(defn arc
-  [a r]
-  (for ))
