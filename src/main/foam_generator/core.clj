@@ -111,24 +111,26 @@
 
 (defmodel valve
   (model :shape (m/circle 2) :mask? false :name :body :order 0 :fn 100)
+  (model :shape nil :name :mask :mask? true)
   (set :fn 100)
-  (forward :length 2)
   (set :shape (m/union (m/circle 2)
                        (m/intersection (->> (m/square 5 2)
                                             (m/translate [5/2 0]))
-                                       (m/circle 5))))
-  (forward :length 15)
-  (set :shape (m/circle 10))
-  (model :shape (binding [m/*fn* 100] (u/ovol 9 2)) :mask? true :name :mask :order 1 :fn 100)
+                                       (m/circle 5)))
+       :to [:body])
+  (set :shape (m/circle 15) :to [:body])
+  (model :shape (binding [m/*fn* 100] (u/ovol 13.5 2)) :mask? true :name :mask :order 1 :fn 100)
   (branch
    :from :body
-   (set :shape (m/square 2 19) :to [:body])
+   (set :shape (m/square 2 (dec (* 15 2))) :to [:body])
    (translate :z 2)
    (forward :length 4 :order 2 :to [:body]))
-  (forward :length 2 :to [:body] :fn 15)
-  (forward :length 4 :to [:body])
-  (translate :z 6 :to [:mask])
-  (spin :angle (* 2 pi) :to [:mask]))
+  (branch
+   :from :body
+   (forward :length 2 :to [:body] :fn 15)
+   (forward :length 4 :to [:body])
+   (translate :z 6 :to [:mask])
+   (spin :angle (* 2 pi) :to [:mask])))
 
 (defmodel arcs
   (model :shape (m/square 1 3) :fn 5 :name :body)
@@ -154,7 +156,6 @@
    (forward :length 3)))
 
 (defmodel trigger
-  :fn 10
   (model :shape (m/square 8 6) :curve-radius 15 :mask? false :name :body)
   (rotate :axis [0 1 0] :angle (/ Math/PI 8))
   (forward :length 10 :gap false)
