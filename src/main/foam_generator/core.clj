@@ -1,12 +1,13 @@
-(ns main.foam-generator.core
+(ns foam-generator.core
   (:require
    [foam-generator.utils :as u]
    [foam-generator.params :as p]
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
    [scad-paths.core :as paths
-    :refer [forward hull left right up down roll backward defmodel translate
+    :refer [forward hull left right up down roll backward defmodel translate path
             model branch segment set arc
+            body mask
             spin lookup-transform rotate transform]]))
 
 (def pi Math/PI)
@@ -64,20 +65,25 @@
               (forward :length 4)
               (hull)])))))
 
-(defmodel squeeze-trigger
-  (model :shape (m/circle 3) :name :body :mask? false)
-  (set :fn 100)
-  (forward :length 10)
-  (left :curve-radius 3)
-  (forward :length 60)
-  (left :curve-radius 3)
-  (forward :length 20)
-  (left :curve-radius 3)
-  (roll :angle Math/PI)
-  (left :angle (/ Math/PI 6))
-  (set :curve-radius 60)
-  (right :angle (/ Math/PI 6))
-  (left :angle (/ Math/PI 3) :curve-radius 4))
+(def trigger
+  (path
+   (model :shape (m/square 8 40) :curve-radius 15 :mask? false :name :body)
+   (rotate :axis [0 1 0] :angle (/ Math/PI 8))
+   (translate :z 20)
+   (forward :length 10 :gap false)
+   #_(branch
+    :from :body
+    (right :angle (/ Math/PI 2) :curve-radius 4 :gap false)
+    (forward :length 10))
+
+   (forward :length 40)
+   (right :angle (- (/ Math/PI 2) (/ Math/PI 8))
+          :curve-radius 4)
+   (forward :length (- 15 3/2))
+   (right :angle (* 2 Math/PI) :curve-radius 4)
+   (right :curve-radius 4 :angle (/ Math/PI 2.3))
+   (right :angle (/ Math/PI 8) :curve-radius 40)
+   (left :angle (/ Math/PI 3.8) :curve-radius 60)))
 
 (defmodel gun-body
   (model :shape (m/minkowski (m/square 35 15) (m/circle 3))
@@ -86,28 +92,28 @@
   (model :shape nil :name :mask :mask? true)
   (set :fn 100)
 
-  (branch
-   :from :body
-   (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
-   (segment air-hose-plug))
+  #_(branch
+     :from :body
+     (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
+     (segment air-hose-plug))
 
-  (branch
-   :from :body
-   (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
-   (translate :x 14 :z 0)
-   (segment tube-connector))
-
-  (branch
-   :from :body
-   (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
-   (translate :x (- 14) :z 0)
-   (segment tube-connector))
+  (segment
+   (for [x [-8 8]]
+     (branch
+      :from :body
+      (rotate :axis [0 1 0] :angle (+ (/ Math/PI 8) Math/PI))
+      (translate :x x)
+      (segment tube-connector))))
 
   (rotate :axis [0 1 0] :angle (/ Math/PI 8))
   (forward :length 90)
   (right :angle (- (/ Math/PI 2) (/ Math/PI 8)))
-  (set :shape (m/circle 15))
-  (forward :length 130))
+
+  #_(set :shape (m/circle 10))
+  #_(forward :length 130)
+  #_(hull))
+
+(m/difference gun-body trigger)
 
 (defmodel valve
   (model :shape (m/circle 2) :mask? false :name :body :order 0 :fn 100)
@@ -154,24 +160,6 @@
   (branch
    :from :body
    (forward :length 3)))
-
-(defmodel trigger
-  (model :shape (m/square 8 6) :curve-radius 15 :mask? false :name :body)
-  (rotate :axis [0 1 0] :angle (/ Math/PI 8))
-  (forward :length 10 :gap false)
-  (branch
-   :from :body
-   (right :angle (/ Math/PI 2) :curve-radius 4 :gap false)
-   (forward :length 10))
-
-  (forward :length 60)
-  (right :angle (- (/ Math/PI 2) (/ Math/PI 8))
-         :curve-radius 4)
-  (forward :length (- 15 3/2))
-  (right :angle (* 2 Math/PI) :curve-radius 4)
-  (right :curve-radius 4 :angle (/ Math/PI 2.3))
-  (right :angle (/ Math/PI 8) :curve-radius 40)
-  (left :angle (/ Math/PI 3.8) :curve-radius 60))
 
 (defn cosine-hill [w h n-steps]
   (m/polygon
@@ -383,3 +371,18 @@
   (left :curve-radius 4)
   (forward :length 248)
   (left :curve-radius 4))
+
+
+(def suction-generator
+  (path
+   (body :shape (m/square (+ 40 1.6)
+                          (+ 40 1.6))
+         :name :body
+         :fn 100)
+   (forward :length 30)
+   (forward :length 0.1)
+   (set :shape (m/circle 5))
+   (translate :z 60)
+   (forward :length 0.1)
+   (hull)
+   (forward :length 30)))
