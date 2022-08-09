@@ -11,6 +11,8 @@
 /.nrepl-port
 /.rebel_readline_history
 /.socket-repl-port
+/out
+*.scad
 .hgignore
 .hg/
 .clj-kondo
