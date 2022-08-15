@@ -10,11 +10,11 @@
             model branch segment set arc result union difference intersection
             body mask spin lookup-transform rotate transform]]))
 
-(def wall-thickness 0.8)
+(def wall-thickness 1.6)
 
 (def fan-w 40)
 (def fan-h 40)
-(def fan-l 25)
+(def fan-l 20)
 (def fan-r 18)
 
 (def float-radius 60)
@@ -28,35 +28,48 @@
   (path
    (body :name :origin :fn 60)
 
-   (result (difference :fan-body :fan-mask))
+   (result (difference :fan-body :fan-mask :fan-input-mask))
+
+   (segment
+    (for [[side i] (map list [:left :right] (range 2))]
+      (branch
+       :from :origin
+       (rotate :z (* i pi))
+       (body :shape (m/circle float-radius)
+             :name :fan-body)
+       (forward :length 5)
+       (set :shape (m/square (+ fan-w 1.6)
+                             (+ fan-h 1.6))
+            :to [:fan-body])
+       (body :shape (m/square fan-w fan-h)
+             :name :fan-mask)
+       (translate :y 10)
+       (rotate :x (- pi|2 fan-mount-angle))
+       (forward :length fan-l)
+       (translate :y 11)
+       (set :shape (m/square (* 4 output-radius)
+                             (* 2 output-radius))
+            :to [:fan-body])
+       (set :shape (m/circle (- output-radius wall-thickness))
+            :to [:fan-mask])
+       (forward :length 24.5)
+       (hull :to [:fan-mask])
+       (down :angle pi|2 :curve-radius 13)
+       (backward :length 29 :to [:fan-body])
+       (forward :length 29 :to [:fan-body])
+       (hull :to [:fan-body] :n-segments 6)
+       (when (= side :left)
+         (segment
+          (set :shape (m/circle output-radius)
+               :to [:fan-body])
+          (forward :length 15)))
+       (forward :length 10 :to [:fan-mask]))))
 
    (branch
     :from :origin
-    (body :shape (m/circle float-radius)
-          :name :fan-body)
-    (forward :length 5)
-    (set :shape (m/square (+ fan-w 1.6)
-                          (+ fan-h 1.6))
-         :to [:fan-body])
-    (body :shape (m/circle fan-r)
-          :name :fan-mask)
-    (translate :y 15)
-    (rotate :x (- pi|2 fan-mount-angle))
+    (body :shape (m/square fan-w fan-l)
+          :name :fan-input-mask)
     (forward :length 20)
-    (down :angle (- output-angle fan-mount-angle)
-          :curve-radius 30 :gap true)
-    (set :shape (m/circle output-radius)
-         :to [:fan-body])
-    (set :shape (m/circle (- output-radius wall-thickness))
-         :to [:fan-mask])
-    (forward :length 20)
-    (hull :to [:fan-mask])
-    (hull :to [:fan-body] :n-segments 3)
-    (forward :length 20)
-    (forward :length 1 :to [:fan-mask]))
-
-   (branch
-    :from :origin
-    (body :shape (m/circle float-radius)
-          :name :float-mask)
-    (backward :length 20))))
+    (backward :length 36)
+    (rotate :x (- pi|2))
+    (forward :length 100))))

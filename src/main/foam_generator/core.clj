@@ -350,13 +350,6 @@
   (set :fn 50)
   (forward :length 80)
 
-  #_(branch
-   :from :body
-   (rotate :z (/ pi 2))
-   (rotate :y (/ pi 2))
-   (translate :y 2.5)
-   (segment motor-mount))
-
   (set :shape nil :to [:mask])
   (forward :length 80)
   (left :curve-radius 4)
@@ -375,8 +368,8 @@
 
 (def suction-generator
   (path
-   (body :shape (m/square (+ 40 1.6)
-                          (+ 40 1.6))
+   (body :shape (m/square (+ 40 1)
+                          (+ 40 1))
          :name :body
          :fn 100)
    (forward :length 30)
