@@ -7,14 +7,14 @@
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
    [scad-paths.core :as paths
-    :refer [forward hull left right up down roll backward defmodel translate path offset
+    :refer [forward hull left right up down roll backward defmodel translate path offset points
             save-transform to model branch segment set arc result union difference intersection
             body mask spin lookup-transform rotate transform]]))
 
 (def wall-thickness 0.8)
 
 (def chamber-coupling-inner-radius 58/2)
-(def chamber-outer-radius 50/2)
+(def chamber-outer-radius 20/2)
 (def chamber-inner-radius (- chamber-outer-radius wall-thickness))
 (def chamber-inner-offset 0)
 
@@ -22,9 +22,11 @@
 (def chamber-threads-bottom-length 15)
 (def chamber-threads-top-length 10)
 
-(def twist-valve-outer-radius (+ chamber-outer-radius
-                                 top-cap-thread-offset
+(def twist-valve-outer-radius (+ chamber-inner-radius
                                  1.6))
+(def twist-valve-thread-length 7)
+(def twist-valve-bottom-flang-length 5)
+(def twist-valve-top-flang-length 20)
 
 (defmethod s/write-expr :screw-by-pitch
   [depth [_ pitch d0 dr length flat]]
@@ -51,16 +53,16 @@
     (->> (m/cube 1000 1000 1000)
          (m/translate [0 0 (- 500)])))))
 
-(def chamber-bottom-threads-outer
+(def twist-valve-thread-mask
   (screw-by-pitch
    :flat 1
-   :d0 (+ 2.2 (- (* 2 chamber-inner-radius) (* 2 top-cap-thread-offset)))
-   :length chamber-threads-bottom-length
+   :d0 (+ 3/4 (- (* 2 chamber-inner-radius) (* 2 top-cap-thread-offset)))
+   :length twist-valve-thread-length
    :dr 1.5
    :pitch 3.8
    :starts 1))
 
-(def chamber-top-threads-inner
+(def chamber-top-threads
   (screw-by-pitch
    :flat 1
    :d0 (* 2 chamber-inner-radius)
@@ -69,38 +71,18 @@
    :pitch 3.8
    :starts 1))
 
-(def chamber-top-threads-inner-bottom-slice
-  (slice-model chamber-top-threads-inner 0 0.01))
+(def chamber-top-threads-bottom-slice
+  (slice-model chamber-top-threads 0 0.01))
 
-(def chamber-top-threads-outer-bottom-slice
-  (slice-model chamber-bottom-threads-outer 0.0 0.02))
+(def twist-valve-thread-mask-bottom-slice
+  (slice-model twist-valve-thread-mask 0.0 0.02))
 
-(def chamber-tube-connector-top
-  (path
-   (body :shape (m/circle chamber-inner-radius)
-         :name :body
-         :fn 100)
-   (mask :shape (m/circle 1.75) :name :mask)
-   (forward :length 1.2)
-   (segment tube-connector)))
+(def twist-valve-thread-mask-top-slice
+  (slice-model twist-valve-thread-mask
+               (- twist-valve-thread-length 0.01)
+               twist-valve-thread-length))
 
-(def chamber-tube-connector-bottom
-  (path
-   (body :shape (m/circle (- chamber-inner-radius top-cap-thread-offset))
-         :name :body
-         :fn 100)
-   (mask :shape (m/circle 3)
-         :name :mask)
-   (forward :length 1.2)
-   (to
-    :models [:body]
-    (forward :length 0.01)
-    (translate :z 2)
-    (forward :length 0.01 :model chamber-top-threads-outer-bottom-slice)
-    (hull)
-    (forward :length chamber-threads-bottom-length :model chamber-bottom-threads-outer))))
-
-(def main-chamber-threads
+(def chamber-bottom-threads
   (screw-by-pitch
    :flat 1
    :d0 (- (* 2 chamber-inner-radius) (* 2 top-cap-thread-offset))
@@ -109,8 +91,8 @@
    :pitch 3.8
    :starts 1))
 
-(def main-chamber-threads-top
-  (slice-model main-chamber-threads (- chamber-threads-bottom-length 0.01) chamber-threads-bottom-length))
+(def chamber-bottom-threads-top-slice
+  (slice-model chamber-bottom-threads (- chamber-threads-bottom-length 0.01) chamber-threads-bottom-length))
 
 (def tube-connection
   (path
@@ -127,8 +109,6 @@
    (offset :offset -1)
    (forward :length 3.01)))
 
-(* 4 3)
-
 (def main-chamber
   (path
    (body :shape (m/circle (- chamber-inner-radius
@@ -143,20 +123,20 @@
    (forward :length chamber-threads-bottom-length :to [:mask]
             :model tube-connection)
    (forward :length chamber-threads-bottom-length :to [:body]
-            :model main-chamber-threads
-            )
+            :model chamber-bottom-threads)
 
-   (forward :length 0.01 :model main-chamber-threads-top :to [:body])
+   (forward :length 0.01 :model chamber-bottom-threads-top-slice :to [:body])
    (translate :z 1.98 :to [:body])
    (forward :length 0.01 :to [:body])
    (hull :to [:body])
    (save-transform :model :body :name ::twist-valve-start)
    (u/curve-segment-2
-      :bottom-radius (- chamber-inner-radius top-cap-thread-offset)
-      :height 4
-      :offset top-cap-thread-offset
-      :to [:body])
-   (u/curve-segment-2
+    :bottom-radius (- chamber-inner-radius top-cap-thread-offset)
+    :height 4
+    :offset top-cap-thread-offset
+    :to [:body])
+   (forward :length 6 :to [:mask])
+   #_(u/curve-segment-2
       :bottom-radius (- chamber-inner-radius top-cap-thread-offset 1.6)
       :height 6
       :offset (+ top-cap-thread-offset 0.9)
@@ -164,39 +144,217 @@
    (backward :length 0.02 :to [:mask])
    (forward :length 0.02 :to [:mask])
    (segment
-      (forward :length 6)
-      (segment
-       (for [i (range 4)]
-         (branch
-          :from :body
-          (to
-           :models [:mask]
-           (set :shape (m/hull (->> (m/circle 1)
-                                    (m/translate [0 2.5]))
-                               (->> (m/circle 1)
-                                    (m/translate [0 -2.5]))) )
-           (rotate :z (* i 1/4 pi))
-           (rotate :x pi|2)
-           (forward :length 200 :center true)))))
+    (forward :length 6)
+    (segment
+     (for [i (range 8)]
+       (branch
+        :from :body
+        (to
+         :models [:mask]
+         (set :shape (m/hull (->> (m/circle 1/4)
+                                  (m/translate [0 3.25]))
+                             (->> (m/circle 1/4)
+                                  (m/translate [0 -3.25]))) )
+         (rotate :z (* i 1/8 pi))
+         (rotate :x pi|2)
+         (forward :length 200 :center true)))))
 
-      (forward :length 6)
-      (to
-       :models [:body]
-       (forward :length 0.01)
-       (translate :z 2.98)
-       (forward :length 0.01 :to [:body]
-                :model chamber-top-threads-inner-bottom-slice)
-       (hull)
-       (forward :length chamber-threads-top-length :to [:body]
-                :model chamber-top-threads-inner))
-      (u/curve-segment-2
-       :bottom-radius (- chamber-inner-radius 1.6)
-       :offset -2
-       :height 4
-       :to [:mask])
-      (forward :length chamber-threads-top-length :to [:mask])
-      (save-transform :model :body :name ::screen-start))))
+    (forward :length 6)
+    (to
+     :models [:body]
+     (forward :length 0.01)
+     (translate :z 2.98)
+     (forward :length 0.01 :to [:body]
+              :model chamber-top-threads-bottom-slice)
+     (hull)
+     (forward :length chamber-threads-top-length :to [:body]
+              :model chamber-top-threads))
+    (forward :length 4 :to [:mask])
+    #_(u/curve-segment-2
+     :bottom-radius (- chamber-inner-radius 1.6)
+     :offset -2
+     :height 4
+     :to [:mask])
+    (forward :length chamber-threads-top-length :to [:mask])
+    (save-transform :model :body :name ::screen-start))))
+
+(def wedge)
 
 (def twist-valve
   (path
-   (body :shape (m/circle))))
+   (body :shape (m/circle twist-valve-outer-radius)
+         :name :body
+         :fn 100)
+   (mask :shape (m/circle (- twist-valve-outer-radius 1.6))
+         :name :mask)
+   (result (difference :body :mask))
+   (forward :length (- twist-valve-bottom-flang-length 1.5))
+   (forward :length 0.01)
+   (translate :z 1.48)
+   (forward :length 0.01 :to [:mask] :model twist-valve-thread-mask-bottom-slice)
+   (forward :length 0.01 :to [:body])
+   (hull)
+   (forward :length twist-valve-thread-length :to [:body])
+   (forward :length twist-valve-thread-length :to [:mask] :model twist-valve-thread-mask)
+   (forward :length 0.01 :to [:mask] :model twist-valve-thread-mask-top-slice)
+   (forward :length 0.01 :to [:body])
+   (translate :z 1.48)
+   (forward :length 0.01)
+   (hull)
+   (forward :length (- twist-valve-top-flang-length 1.5))))
+
+(def screen-top-tpu
+  (path
+   (body :shape (m/circle (- chamber-inner-radius 1.6))
+         :name :body
+         :fn 100)
+   #_(segment
+      (for [i (range 3)
+            :let [d 6
+                  r (+ 4 (* i (/ (- chamber-inner-radius 5) 3)))
+                  c (* 2 pi r)
+                  n-holes (quot c d)]
+            j (range  n-holes)]
+        (branch
+         :from :body
+         (rotate :z (* j (/ (* 2 pi) n-holes)))
+         (translate :x r)
+         (set :shape (m/circle 2))
+         (forward :length 2.1)
+         (set :mask? true))))
+   (forward :length 1.2)
+   (mask :shape (m/circle (- chamber-inner-radius 1.6 1.2))
+         :name :mask)
+   (forward :length 6.4)))
+
+
+
+(def screen-top
+  (path
+   (body :shape (m/circle (- chamber-inner-radius 1.6))
+         :name :body
+         :fn 100)
+   #_(segment
+      (for [i (range 3)
+            :let [d 6
+                  r (+ 4 (* i (/ (- chamber-inner-radius 5) 3)))
+                  c (* 2 pi r)
+                  n-holes (quot c d)]
+            j (range  n-holes)]
+        (branch
+         :from :body
+         (rotate :z (* j (/ (* 2 pi) n-holes)))
+         (translate :x r)
+         (set :shape (m/circle 2))
+         (forward :length 2.1)
+         (set :mask? true))))
+   (mask :shape (m/circle (- chamber-inner-radius 5))
+         :name :mask)
+   (forward :length 1.2)
+   (set :shape (m/circle (- chamber-inner-radius 1.6 1.2))
+        :to [:mask])
+
+   (forward :length 7)))
+
+(def inner-screen-ring
+  (path
+   (body :shape (m/circle (- chamber-inner-radius 1.6 1.2 0.15))
+         :name :body
+         :fn 100)
+   (mask :shape (m/circle (- chamber-inner-radius 1.6 1.2 0.15 1.2))
+         :name :mask)
+   (forward :length (- 7 1.2))))
+
+(def chamber-top-threads-mask-length
+  (- chamber-threads-top-length 1/2))
+
+(def chamber-top-threads-mask
+  (screw-by-pitch
+   :flat 1
+   :d0 (+ 1/2 (* 2 chamber-inner-radius))
+   :length chamber-top-threads-mask-length
+   :dr 1.5
+   :pitch 3.8
+   :starts 1))
+
+(def chamber-top-threads-mask-top-slice
+  (slice-model chamber-top-threads-mask
+               (- chamber-top-threads-mask-length 0.01)
+               chamber-top-threads-mask-length))
+
+(def vacuum-coupling
+  (path
+   (body :name :origin :fn 60)
+
+   (result (union
+            (difference :thread-body :thread-mask)
+            (difference :coupling-outer :coupling-inner :thread-mask)))
+
+   (branch
+    :from :origin
+    (body :shape (m/circle (+ chamber-coupling-inner-radius 1.6))
+          :name :coupling-outer)
+    (forward :length 2)
+    (body :shape (m/circle chamber-coupling-inner-radius)
+          :name :coupling-inner)
+    (forward :length 30))
+
+   (branch
+    :from :origin
+    (body :shape (m/circle (- chamber-inner-radius 1.5))
+          :name :thread-mask)
+    (body :shape (m/circle (+ 3 chamber-inner-radius))
+          :name :thread-body)
+    (forward :length chamber-top-threads-mask-length
+             :model chamber-top-threads-mask
+             :to [:thread-mask])
+    (forward :length chamber-top-threads-mask-length
+             :to [:thread-body])
+    (forward :length 0.01
+             :to [:thread-mask]
+             :model chamber-top-threads-mask-top-slice)
+    (forward :length 0.01
+             :to [:thread-body])
+    (translate :z 3)
+    (set :shape (m/circle (+ chamber-inner-radius 1/2))
+         :to [:thread-body])
+    (forward :length 0.01)
+    (hull)
+    (forward :length 4)
+    (forward :length 0.01)
+    (offset :offset -1.5)
+    (translate :z 2.98)
+    (forward :length 0.01)
+    (hull))))
+
+(def distance-between-walls 1/2)
+(def wall-thickness 1.2)
+
+(def vacuum-coupling-v2
+  (path
+   (body :name :origin :fn 30)
+
+   (result (union (difference :outer-wall-body
+                                :outer-wall-mask)
+                  (difference :inner-wall-body
+                              :inner-wall-mask)))
+
+   (branch
+    :from :origin
+    (body :shape (m/circle 12) :name :outer-wall-body)
+    (body :shape (m/circle (- 12 wall-thickness)) :name :outer-wall-mask)
+    (body :shape (m/circle (- 12 wall-thickness distance-between-walls)) :name :inner-wall-body)
+    (body :shape (m/circle (- 12 wall-thickness distance-between-walls wall-thickness)) :name :inner-wall-mask)
+    (forward :length 15)
+    (segment
+     (for [[model offset] [[:outer-wall-body 0]
+                           [:outer-wall-mask (- wall-thickness)]
+                           [:inner-wall-body (- (+ wall-thickness distance-between-walls))]
+                           [:inner-wall-mask (- (+ (* 2 wall-thickness) distance-between-walls))]]]
+       (u/curve-segment-2
+        :bottom-radius (+ 12 offset)
+        :offset 10
+        :height 30
+        :curve-offset offset
+        :to [model]))
+     (forward :length 20)))))
