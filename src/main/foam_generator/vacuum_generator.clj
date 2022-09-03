@@ -11,18 +11,9 @@
             save-transform to model branch segment set arc result union difference intersection
             body mask spin lookup-transform rotate transform]]))
 
-(def tmp
-  (path
-   (body :name :a :shape (m/circle 10) :fn 80)
-   (mask :name :b :shape (m/circle 8))
-   #_(result (difference :a :b))
-   (forward :length 20)))
-
 (def wall-thickness 0.8)
 
 (def chamber-coupling-inner-radius 58/2)
-(def chamber-coupling-outer-radius
-  (+ chamber-coupling-inner-radius 1.2))
 (def chamber-outer-radius 20/2)
 (def chamber-inner-radius (- chamber-outer-radius wall-thickness))
 (def chamber-inner-offset 0)
@@ -103,9 +94,9 @@
 (def chamber-bottom-threads-top-slice
   (slice-model chamber-bottom-threads (- chamber-threads-bottom-length 0.01) chamber-threads-bottom-length))
 
-(def tube-connection
+(defn make-tube-connection [name]
   (path
-   (body :shape (m/circle (/ 9.2 2)) :name :tube-mask
+   (body :shape (m/circle (/ 9.2 2)) :name name
          :fn 100)
    (segment
     (for [_ (range 3)]
@@ -117,6 +108,9 @@
        (offset :offset 0.25))))
    (offset :offset -1)
    (forward :length 3.01)))
+
+(def tube-connection
+  (make-tube-connection :tube-mask))
 
 (def main-chamber
   (path
@@ -187,6 +181,8 @@
     (forward :length chamber-threads-top-length :to [:mask])
     (save-transform :model :body :name ::screen-start))))
 
+(def wedge)
+
 (def twist-valve
   (path
    (body :shape (m/circle twist-valve-outer-radius)
@@ -233,6 +229,8 @@
    (mask :shape (m/circle (- chamber-inner-radius 1.6 1.2))
          :name :mask)
    (forward :length 6.4)))
+
+
 
 (def screen-top
   (path
@@ -339,48 +337,58 @@
   (path
    (body :name :origin :fn 30)
 
-   (result
-    (union
-     (difference :outer_wall_body
-                 :outer_wall_mask)
-     (difference :inner_wall_body
-                 :inner_wall_mask)))
+   (result (union (difference :outer-wall-body
+                              :outer-wall-mask
+                              :air-holes)
+                  (difference :inner-wall-body
+                              :inner-wall-mask)))
 
    (branch
     :from :origin
-    (body :shape (m/circle 12) :name :outer_wall_body)
-    (body :shape (m/circle (- 12 wall-thickness)) :name :outer_wall_mask)
-    (body :shape (m/circle (- 12 wall-thickness distance-between-walls)) :name :inner_wall_body)
-    (body :shape (m/circle (- 12 wall-thickness distance-between-walls wall-thickness)) :name :inner_wall_mask)
-    (forward :length 15)
+    (body :shape (m/circle 1/4) :name :air-holes)
+    (translate :z 46)
     (segment
-     (for [[model offset] [[:outer_wall_body 0]
-                           [:outer_wall_mask (- wall-thickness)]
-                           [:inner_wall_body (- (+ wall-thickness distance-between-walls))]
-                           [:inner_wall_mask (- (+ (* 2 wall-thickness) distance-between-walls))]]]
+     (for [zi (range 5)
+           ri (range 40)]
+       (branch
+        :from :air-holes
+        (translate :z zi)
+        (rotate :z (* ri 2/40 pi))
+        (rotate :x (- pi|2))
+        (forward :length 100 :center true)))))
+
+   (branch
+    :from :origin
+    (body :shape (m/circle 12) :name :outer-wall-body)
+    (body :shape (m/circle (- 12 wall-thickness)) :name :outer-wall-mask)
+    (body :shape (m/circle (- 12 wall-thickness distance-between-walls)) :name :inner-wall-body)
+    (body :shape (m/circle (- 12 wall-thickness distance-between-walls wall-thickness)) :name :inner-wall-mask)
+
+    (to
+     :models [:inner-wall-mask]
+     (forward :length 15
+              :model (make-tube-connection :inner-wall-mask)))
+    (to
+     :models [:outer-wall-body
+              :outer-wall-mask
+              :inner-wall-body
+              :inner-wall-mask]
+     (forward :length 15))
+    (segment
+     (for [[model offset] [[:outer-wall-body 0]
+                           [:outer-wall-mask (- wall-thickness)]
+                           [:inner-wall-body (- (+ wall-thickness distance-between-walls))]
+                           [:inner-wall-mask (- (+ (* 2 wall-thickness) distance-between-walls))]]]
        (segment
         (u/curve-segment-2
          :bottom-radius (+ 12 offset)
-         :offset (- chamber-coupling-outer-radius 12)
-         :height 45
+         :offset 10
+         :height 30
          :curve-offset offset
          :to [model])
         (forward :length 20 :to [model])
-        (cond
-          (or (= model :inner_wall_body)
-              (= model :inner_wall_mask))
-          (to
-           :models [model]
-           (forward :length 0.01)
-           (scad-paths.core/offset :offset -1)
-           (translate :z 4)
-           (forward :length 0.01)
-           (hull)
-           (forward :length 4))
-
-          (or (= model :outer_wall_mask)
-              (= model :outer_wall_body))
-          (to
-           :models [model]
-           (forward :length 30)))
-        (forward :length 10 :to [model])))))))
+        (case model
+          (:outer-wall-body :outer-wall-mask)
+          (segment
+           (forward :length 20 :to [model]))
+          nil)))))))
