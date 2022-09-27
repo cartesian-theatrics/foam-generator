@@ -96,7 +96,8 @@
 
 (defn make-tube-connection [name]
   (path
-   (body :shape (m/circle (/ 9.2 2)) :name name
+   (result :name name :expr :tube-connection-mask)
+   (body :shape (m/circle (/ 9.2 2)) :name :tube-connection-mask
          :fn 100)
    (segment
     (for [_ (range 3)]
@@ -114,6 +115,7 @@
 
 (def main-chamber
   (path
+   (result :name :main-chamber :expr (difference :body :mask :tube-mask))
    (body :shape (m/circle (- chamber-inner-radius
                              top-cap-thread-offset))
          :name :body
@@ -122,9 +124,7 @@
                              top-cap-thread-offset
                              2.5))
          :name :mask)
-   (result (difference :body :mask :tube-mask))
-   (forward :length chamber-threads-bottom-length :to [:mask]
-            :model tube-connection)
+   (segment tube-connection)
    (forward :length chamber-threads-bottom-length :to [:body]
             :model chamber-bottom-threads)
 
@@ -139,11 +139,6 @@
     :offset top-cap-thread-offset
     :to [:body])
    (forward :length 6 :to [:mask])
-   #_(u/curve-segment-2
-      :bottom-radius (- chamber-inner-radius top-cap-thread-offset 1.6)
-      :height 6
-      :offset (+ top-cap-thread-offset 0.9)
-      :to [:mask])
    (backward :length 0.02 :to [:mask])
    (forward :length 0.02 :to [:mask])
    (segment
@@ -173,15 +168,8 @@
      (forward :length chamber-threads-top-length :to [:body]
               :model chamber-top-threads))
     (forward :length 4 :to [:mask])
-    #_(u/curve-segment-2
-     :bottom-radius (- chamber-inner-radius 1.6)
-     :offset -2
-     :height 4
-     :to [:mask])
     (forward :length chamber-threads-top-length :to [:mask])
     (save-transform :model :body :name ::screen-start))))
-
-(def wedge)
 
 (def twist-valve
   (path
@@ -190,7 +178,7 @@
          :fn 100)
    (mask :shape (m/circle (- twist-valve-outer-radius 1.6))
          :name :mask)
-   (result (difference :body :mask))
+   (result :name :twist-valve :expr (difference :body :mask))
    (forward :length (- twist-valve-bottom-flang-length 1.5))
    (forward :length 0.01)
    (translate :z 1.48)
@@ -289,9 +277,10 @@
   (path
    (body :name :origin :fn 60)
 
-   (result (union
-            (difference :thread-body :thread-mask)
-            (difference :coupling-outer :coupling-inner :thread-mask)))
+   (result :name :vacuum-coupling
+           :expr (union
+                  (difference :thread-body :thread-mask)
+                  (difference :coupling-outer :coupling-inner :thread-mask)))
 
    (branch
     :from :origin
@@ -337,11 +326,12 @@
   (path
    (body :name :origin :fn 30)
 
-   (result (union (difference :outer-wall-body
-                              :outer-wall-mask
-                              :air-holes)
-                  (difference :inner-wall-body
-                              :inner-wall-mask)))
+   (result :vacuum-coupling-v2
+           :expr (union (difference :outer-wall-body
+                                    :outer-wall-mask
+                                    :air-holes)
+                        (difference :inner-wall-body
+                                    :inner-wall-mask)))
 
    (branch
     :from :origin
