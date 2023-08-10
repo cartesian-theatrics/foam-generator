@@ -5,7 +5,7 @@
    [foam-generator.math :refer [cos sin pi pi|2 pi|3 pi|4 pi|5 pi|6 atan acos asin sqr sqrt tan |2 |3 |4]]
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
-   [scad-paths.core :as paths
+   [plexus.core :as paths
     :refer [forward hull left right up down roll backward defmodel translate path
             model branch segment set arc result union difference intersection
             body mask spin lookup-transform rotate transform]]))

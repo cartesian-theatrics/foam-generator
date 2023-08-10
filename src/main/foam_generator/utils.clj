@@ -4,7 +4,7 @@
    [scad-clj.model :as m]
    [malli.core :as malli]
    [foam-generator.math :refer [cos sin pi pi|2 pi|3 pi|4 pi|5 pi|6 atan acos asin sqr sqrt tan |2 |3 |4]]
-   [scad-paths.core :as paths
+   [plexus.core :as paths
     :refer [model forward hull left right up down roll backward defmodel defpoly poly
             translate set segment lookup-transform pattern transform branch offset
             minkowski rotate body mask save-transform spin

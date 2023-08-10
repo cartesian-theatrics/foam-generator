@@ -5,7 +5,7 @@
    [foam-generator.params :as p]
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
-   [scad-paths.core :as paths
+   [plexus.core :as paths
     :refer [forward hull left right up down roll backward defmodel translate path
             body mask
             model branch segment set arc

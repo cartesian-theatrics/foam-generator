@@ -6,7 +6,7 @@
    [foam-generator.core :refer [tube-connector]]
    [scad-clj.model :as m]
    [scad-clj.scad :as s]
-   [scad-paths.core :as paths
+   [plexus.core :as paths
     :refer [forward hull left right up down roll backward defmodel translate path offset points
             save-transform to model branch segment set arc result union difference intersection
             body mask spin lookup-transform rotate transform]]))
